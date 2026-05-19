@@ -2576,7 +2576,8 @@
           offlineOverlay = L.imageOverlay(OFFLINE_MAP_B64, OFFLINE_BOUNDS, {
             opacity: 0.88,
             zIndex: 200,
-            interactive: false
+            interactive: false,
+            pane: 'tilePane'
           });
         }
         offlineOverlay.addTo(map);

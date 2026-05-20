@@ -6812,12 +6812,15 @@
       el=document.getElementById('profileEmailDisplay'); if(el) el.textContent='✉ '+(session.email||'—');
       el=document.getElementById('profileNameInput'); if(el) el.value=session.displayName||'';
 
-      // Show offline indicator banner
+      // Show offline indicator banner — auto-dismisses after 4 seconds
       var banner = document.createElement('div');
       banner.id = 'offlineBanner';
-      banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(255,140,0,0.92);color:#000;text-align:center;font-size:12px;font-weight:700;padding:4px 8px;letter-spacing:1px;pointer-events:none;';
+      banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(255,140,0,0.92);color:#000;text-align:center;font-size:12px;font-weight:700;padding:4px 8px;letter-spacing:1px;pointer-events:none;transition:opacity 0.8s ease;';
       banner.textContent = '⚠ OFFLINE MODE — Chat, notices and admin features unavailable';
       document.body.appendChild(banner);
+      // Fade out after 3.5s, remove after 4.3s
+      setTimeout(function(){ banner.style.opacity='0'; }, 3500);
+      setTimeout(function(){ var ob=document.getElementById('offlineBanner'); if(ob) ob.remove(); }, 4300);
 
       if(window._setChatUser) window._setChatUser(session.uid);
       if(!window._appInitialized){ window._appInitialized=true; initializeApp(); }

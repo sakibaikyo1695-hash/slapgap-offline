@@ -6922,17 +6922,42 @@
     }
     var _sessionListener = null; // holds onValue unsubscribe
 
-    // ── Offline-first boot: if no internet, try cached session immediately ──
+    // ── Offline-first boot ────────────────────────────────────────────
+    // Track whether we already booted from cache so onAuthStateChanged
+    // cannot override it and kick the user back to the login screen.
+    var _bootedFromCache = false;
+
     if(!isOnline()){
       var _cachedSession = loadOfflineSession();
       if(_cachedSession){
-        // Boot from cache — Firebase won't be available
+        _bootedFromCache = true;
         setTimeout(function(){ bootWithOfflineSession(_cachedSession); }, 300);
       }
-      // If no cache, fall through — user must connect to internet to register/login
+      // No cache + no internet = stay on login screen, show message
+      else {
+        setTimeout(function(){
+          setMsg('loginMsg','No internet connection. Connect to internet for first-time login.','error');
+        }, 500);
+      }
+    } else {
+      // Online — check if we have a cache and show a subtle "restoring session" hint
+      var _onlineCache = loadOfflineSession();
+      if(_onlineCache){
+        // User likely has a saved session — Firebase will auto-login shortly
+        // Show subtle loading state so screen doesn't feel frozen
+        setTimeout(function(){
+          if(authScreen && !authScreen.classList.contains('hidden')){
+            setMsg('loginMsg','Restoring session...','');
+          }
+        }, 800);
+      }
     }
 
     fbAuth.onAuthStateChanged(function(user){
+      // If we already booted from offline cache, don't let Firebase
+      // override it — onAuthStateChanged fires null when offline
+      if(_bootedFromCache) return;
+
       if(!user){
         authScreen.classList.remove('hidden'); showPanel('login');
         document.getElementById('loginBtn').disabled=false; document.getElementById('loginBtn').textContent='LOGIN';

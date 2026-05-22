@@ -5,9 +5,6 @@
   <title>SLAP-GAP OFFLINE | Air Nav</title>
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover" />
   <link rel="manifest" href="manifest.json">
-  <link rel="apple-touch-icon" href="icon-192.png">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="SLAP-GAP">
   <meta name="theme-color" content="#0a0f1a">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -548,6 +545,28 @@
     #mapFloatingBtns{
       position:absolute;bottom:calc(24px + var(--safe-bottom));left:calc(14px + var(--safe-left));z-index:1000;
       display:flex;gap:10px;align-items:flex-end;
+    }
+    #flyHUD{
+      display:none;
+      position:absolute;bottom:calc(90px + var(--safe-bottom));right:calc(12px + var(--safe-right,0px));
+      z-index:1000;
+      background:rgba(10,14,20,0.82);
+      border:1.5px solid rgba(0,230,118,0.45);
+      border-radius:10px;
+      padding:8px 13px;
+      backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+      box-shadow:0 2px 16px rgba(0,230,118,0.15);
+      min-width:130px;
+    }
+    #flyHUD .hud-row{
+      display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:2px 0;
+    }
+    #flyHUD .hud-label{
+      font-size:9px;letter-spacing:1.2px;color:var(--accent-green);
+      font-family:var(--font-display);font-weight:700;white-space:nowrap;
+    }
+    #flyHUD .hud-value{
+      font-family:var(--font-mono);font-size:13px;color:var(--text-bright);font-weight:700;
     }
     .map-float-btn{
       width:48px;height:48px;border-radius:50%;
@@ -1401,6 +1420,13 @@
   <button id="stopMeasureBtn">⏹ STOP</button>
   <button id="offlineMapBtn">🗺️ OFFLINE MAP</button>
 
+  <!-- FLY HUD overlay: shown when flying is active -->
+  <div id="flyHUD">
+    <div class="hud-row"><span class="hud-label">SPD</span><span class="hud-value" id="hudSpeed">-- kts</span></div>
+    <div class="hud-row"><span class="hud-label">COG</span><span class="hud-value" id="hudCourse">--°</span></div>
+    <div class="hud-row"><span class="hud-label">ALT</span><span class="hud-value" id="hudAlt">-- ft</span></div>
+  </div>
+
   <!-- Floating bottom-left buttons (only the buttons, popups are outside map) -->
   <div id="mapFloatingBtns">
     <button class="map-float-btn" id="profileFloatBtn" title="Profile" onclick="event.stopPropagation();event.stopImmediatePropagation();event.preventDefault();toggleProfilePopup(event)">👤</button>
@@ -1543,6 +1569,7 @@
       <div id="gpsInfo">
         <div class="gps-row"><span class="gps-label">GPS SPEED</span><span class="gps-value" id="gpsSpeed">-- kts</span></div>
         <div class="gps-row"><span class="gps-label">COURSE OG</span><span class="gps-value" id="gpsCourse">--°</span></div>
+        <div class="gps-row"><span class="gps-label">GPS ALT</span><span class="gps-value" id="gpsAlt">-- ft</span></div>
       </div>
       <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-dim)">
         <div class="btn-row">
@@ -2625,6 +2652,11 @@
           gpsInfoDiv=document.getElementById('gpsInfo'),
           gpsSpeedSpan=document.getElementById('gpsSpeed'),
           gpsCourseSpan=document.getElementById('gpsCourse'),
+          gpsAltSpan=document.getElementById('gpsAlt'),
+          flyHUD=document.getElementById('flyHUD'),
+          hudSpeedSpan=document.getElementById('hudSpeed'),
+          hudCourseSpan=document.getElementById('hudCourse'),
+          hudAltSpan=document.getElementById('hudAlt'),
           measurementInfoDiv=document.getElementById('measurementInfo'),
           measureBtn=document.getElementById('measureBtn'),
           stopMeasureBtn=document.getElementById('stopMeasureBtn'),
@@ -2791,10 +2823,20 @@
     /* ================================================
        GPS
     ================================================ */
-    function updateGPSInfo(speed,heading){
+    function updateGPSInfo(speed,heading,altM){
       lastSpeedGPS=speed;lastCourseGPS=heading;
       gpsSpeedSpan.textContent=speed.toFixed(1)+' kts';
       gpsCourseSpan.textContent=heading.toFixed(1)+'°';
+      hudSpeedSpan.textContent=speed.toFixed(1)+' kts';
+      hudCourseSpan.textContent=heading.toFixed(1)+'°';
+      if(altM!=null&&!isNaN(altM)){
+        const altFt=Math.round(altM*3.28084);
+        gpsAltSpan.textContent=altFt+' ft';
+        hudAltSpan.textContent=altFt+' ft';
+      } else {
+        gpsAltSpan.textContent='-- ft';
+        hudAltSpan.textContent='-- ft';
+      }
       if(flyMarker)flyMarker.setIcon(createHelicopterIcon(heading));
     }
 
@@ -3554,13 +3596,15 @@
       if(!isAPK&&'https:'!==location.protocol)return void alert('Geolocation requires location permission. Please allow location access in your device settings.');
 
       gpsInfoDiv.style.display='block';
+      flyHUD.style.display='block';
       flyMarker=L.marker([0,0],{icon:createHelicopterIcon(0)}).addTo(map);
 
       function onGPSPos(pos){
         const lat=pos.coords.latitude,lon=pos.coords.longitude,
               speed=1.94384*(pos.coords.speed||0),
-              heading=null!==pos.coords.heading&&undefined!==pos.coords.heading?pos.coords.heading:lastCourseGPS;
-        updateGPSInfo(speed,heading);flyMarker.setLatLng([lat,lon]);
+              heading=null!==pos.coords.heading&&undefined!==pos.coords.heading?pos.coords.heading:lastCourseGPS,
+              altM=pos.coords.altitude;
+        updateGPSInfo(speed,heading,altM);flyMarker.setLatLng([lat,lon]);
         coordsOut.textContent=formatDMS(lat,true)+', '+formatDMS(lon,false);
         map.setView([lat,lon]);updateRouteSummary();
         if(movingTrackActive)updateMovingTrack();
@@ -3584,6 +3628,7 @@
       if(flyWatchId)navigator.geolocation.clearWatch(flyWatchId);
       if(flyMarker)map.removeLayer(flyMarker);
       flyMarker=null;flyWatchId=null;gpsInfoDiv.style.display='none';
+      flyHUD.style.display='none';
       if(movingTrackActive)stopMovingTrack();
     }
 
@@ -3597,6 +3642,7 @@
       if(!isAPK&&'https:'!==location.protocol)return void alert('Geolocation requires location permission. Please allow location access in your device settings.');
 
       gpsInfoDiv.style.display='block';
+      flyHUD.style.display='block';
       if(directLayer)map.removeLayer(directLayer);
       directLayer=L.polyline([],{color:'#ff00ff',weight:2,dashArray:'4'}).addTo(map);
       if(!flyMarker)flyMarker=L.marker([0,0],{icon:createHelicopterIcon(0)}).addTo(map);
@@ -3604,8 +3650,9 @@
       function onGPSPos(pos){
         const lat=pos.coords.latitude,lon=pos.coords.longitude,
               speed=1.94384*(pos.coords.speed||0),
-              heading=null!==pos.coords.heading&&undefined!==pos.coords.heading?pos.coords.heading:lastCourseGPS;
-        updateGPSInfo(speed,heading);flyMarker.setLatLng([lat,lon]);
+              heading=null!==pos.coords.heading&&undefined!==pos.coords.heading?pos.coords.heading:lastCourseGPS,
+              altM=pos.coords.altitude;
+        updateGPSInfo(speed,heading,altM);flyMarker.setLatLng([lat,lon]);
         coordsOut.textContent=formatDMS(lat,true)+', '+formatDMS(lon,false);
         map.setView([lat,lon]);
         const target=waypoints.find(w=>w.id===directTargetId);if(!target)return;
@@ -3637,6 +3684,7 @@
       routeSummaryDiv.innerHTML='';
       if(flyMarker){map.removeLayer(flyMarker);flyMarker=null;}
       flyWatchId=null;gpsInfoDiv.style.display='none';
+      flyHUD.style.display='none';
       if(movingTrackActive)stopMovingTrack();
     }
 
